@@ -1,3 +1,43 @@
+const editCandidatesByMatrixInfo = (tableOfCandidates, matrix) => {
+    let indexForRemoving;
+
+    matrix.forEach((row, rowIndex) => {
+        row.forEach((digit, columnIndex) => {
+            if (digit) {
+                tableOfCandidates.rows[rowIndex][columnIndex].length = 0;
+
+                tableOfCandidates.rows[rowIndex].forEach(candidates => {
+                    indexForRemoving = candidates.indexOf(digit);
+
+                    if (indexForRemoving >= 0) {
+                        candidates.splice(indexForRemoving, 1);
+                    }
+                });
+
+                tableOfCandidates.columns[columnIndex].forEach(candidates => {
+                    indexForRemoving = candidates.indexOf(digit);
+
+                    if (indexForRemoving >= 0) {
+                        candidates.splice(indexForRemoving, 1);
+                    }
+                });
+
+                tableOfCandidates.blocks.rows[Math.trunc(rowIndex / 3)][
+                    Math.trunc(columnIndex / 3)
+                ].rows.forEach(blockRow => {
+                    blockRow.forEach(candidates => {
+                        indexForRemoving = candidates.indexOf(digit);
+
+                        if (indexForRemoving >= 0) {
+                            candidates.splice(indexForRemoving, 1);
+                        }
+                    });
+                });
+            }
+        });
+    });
+};
+
 const createTableOfCandidates = matrix => {
     let newTableOfCandidates = {
         blocks: { rows: [[], [], []], columns: [[], [], []] },
@@ -44,43 +84,7 @@ const createTableOfCandidates = matrix => {
         }
     }
 
-    matrix.forEach((row, rowIndex) => {
-        row.forEach((digit, columnIndex) => {
-            if (digit) {
-                newTableOfCandidates.rows[rowIndex][columnIndex].length = 0;
-
-                newTableOfCandidates.rows[rowIndex].forEach(candidates => {
-                    indexForRemoving = candidates.indexOf(digit);
-
-                    if (indexForRemoving >= 0) {
-                        candidates.splice(indexForRemoving, 1);
-                    }
-                });
-
-                newTableOfCandidates.columns[columnIndex].forEach(
-                    candidates => {
-                        indexForRemoving = candidates.indexOf(digit);
-
-                        if (indexForRemoving >= 0) {
-                            candidates.splice(indexForRemoving, 1);
-                        }
-                    }
-                );
-
-                newTableOfCandidates.blocks.rows[Math.trunc(rowIndex / 3)][
-                    Math.trunc(columnIndex / 3)
-                ].rows.forEach(blockRow => {
-                    blockRow.forEach(candidates => {
-                        indexForRemoving = candidates.indexOf(digit);
-
-                        if (indexForRemoving >= 0) {
-                            candidates.splice(indexForRemoving, 1);
-                        }
-                    });
-                });
-            }
-        });
-    });
+    editCandidatesByMatrixInfo(newTableOfCandidates, matrix);
 
     return newTableOfCandidates;
 };
@@ -283,6 +287,41 @@ const searchForLockedCandidates = (tableOfCandidates, matrix) => {
                                 });
                             }
                         }
+
+                        if (!foundLockedCandidates) {
+                            foundLockedCandidates = !tableOfCandidates.rows[
+                                blockRowIndex * 3 + rowIndex
+                            ].some(allowedDigits => {
+                                if (
+                                    !row.includes(allowedDigits) &&
+                                    allowedDigits.includes(digit)
+                                ) {
+                                    return true;
+                                }
+                                return false;
+                            });
+
+                            if (foundLockedCandidates) {
+                                block.rows.forEach(foundRow => {
+                                    if (foundRow !== row) {
+                                        foundRow.forEach(allowedDigits => {
+                                            indexForRemoving = allowedDigits.indexOf(
+                                                digit
+                                            );
+
+                                            if (indexForRemoving >= 0) {
+                                                profit = true;
+                                                allowedDigits.splice(
+                                                    indexForRemoving,
+                                                    1
+                                                );
+                                            }
+                                        });
+                                    }
+                                });
+                            } else {
+                            }
+                        }
                     });
                 });
             });
@@ -445,6 +484,10 @@ module.exports = function solveSudoku(matrix) {
     let lockedCandidatesProfit = true;
     let sameCandidatesProfit = true;
     let candidatesExist = true;
+    let pointingDigitPairsAndTripletsProfit = true;
+    let bufferForCandidate;
+    let candidateRow;
+    let candidateColumn;
 
     while (candidatesExist) {
         singleCandidatesProfit = true;
@@ -480,17 +523,57 @@ module.exports = function solveSudoku(matrix) {
         });
 
         if (candidatesExist) {
-            tableOfCandidates.rows.some((row, rowIndex) => {
-                return row.some((candidates, columnIndex) => {
+            tableOfCandidates.rows.forEach((row, rowIndex) => {
+                row.forEach((candidates, columnIndex) => {
                     if (candidates[0]) {
-                        matrix[rowIndex][columnIndex] = candidates.pop();
-                        return true;
+                        if (!bufferForCandidate) {
+                            bufferForCandidate = candidates;
+                        } else if (bufferForCandidate.length === 0) {
+                            bufferForCandidate = candidates;
+                        } else if (
+                            bufferForCandidate.length > candidates.length
+                        ) {
+                            bufferForCandidate = candidates;
+                        }
+
+                        if (bufferForCandidate === candidates) {
+                            candidateRow = rowIndex;
+                            candidateColumn = columnIndex;
+                        }
                     }
-                    return false;
                 });
             });
+
+            matrix[candidateRow][candidateColumn] = bufferForCandidate.pop();
+
+            editCandidatesByMatrixInfo(tableOfCandidates, matrix);
         }
     }
+
+    /*tableOfCandidates.rows.forEach(row => {
+        console.log(
+            row[0].join("") +
+                "f\t" +
+                row[1].join("") +
+                "f\t" +
+                row[2].join("") +
+                "f\t" +
+                row[3].join("") +
+                "f\t" +
+                row[4].join("") +
+                "f\t" +
+                row[5].join("") +
+                "f\t" +
+                row[6].join("") +
+                "f\t" +
+                row[7].join("") +
+                "f\t" +
+                row[8].join("") +
+                "f\t"
+        );
+    });
+
+    console.log(matrix.join("\n"));*/
 
     return matrix;
 };
